@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>User Manager</title>
+  <style>
+    :root {
+      --bg: #0d0d0f;
+      --panel: #16161a;
+      --border: #2a2a31;
+      --text: #f5f5f7;
+      --muted: #9a9aa5;
+      --accent: #e8e8ea;
+      --danger: #ff5c5c;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 40px 20px;
+    }
+    .wrap { max-width: 760px; margin: 0 auto; }
+    h1 { font-weight: 600; letter-spacing: -0.02em; margin: 0 0 4px; }
+    .sub { color: var(--muted); margin: 0 0 28px; font-size: 14px; }
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px;
+      margin-bottom: 24px;
+    }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; }
+    input {
+      flex: 1;
+      min-width: 180px;
+      background: #0d0d0f;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 11px 13px;
+      border-radius: 9px;
+      font-size: 14px;
+      outline: none;
+    }
+    input:focus { border-color: #4a4a55; }
+    button {
+      border: none;
+      border-radius: 9px;
+      padding: 11px 18px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: opacity .15s;
+    }
+    button:hover { opacity: .85; }
+    .primary { background: var(--accent); color: #0d0d0f; }
+    .ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 12px 10px; font-size: 14px; }
+    th { color: var(--muted); font-weight: 500; border-bottom: 1px solid var(--border); }
+    td { border-bottom: 1px solid var(--border); }
+    tr:last-child td { border-bottom: none; }
+    .actions { display: flex; gap: 8px; }
+    .mini { padding: 6px 12px; font-size: 13px; }
+    .edit { background: #2a2a31; color: var(--text); }
+    .del { background: transparent; color: var(--danger); border: 1px solid #3a2024; }
+    .empty { color: var(--muted); text-align: center; padding: 28px; font-size: 14px; }
+    .status { font-size: 13px; color: var(--muted); min-height: 18px; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>User Manager</h1>
+    <p class="sub">Add, edit and delete users stored in your Flask + SQLite database.</p>
+
+    <div class="panel">
+      <div class="row">
+        <input id="name" placeholder="Name" />
+        <input id="email" placeholder="Email" />
+        <button class="primary" id="saveBtn" onclick="save()">Add user</button>
+        <button class="ghost" id="cancelBtn" onclick="cancelEdit()" style="display:none;">Cancel</button>
+      </div>
+      <div class="status" id="status"></div>
+    </div>
+
+    <div class="panel">
+      <table>
+        <thead>
+          <tr><th>ID</th><th>Name</th><th>Email</th><th style="width:160px;">Actions</th></tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+      <div class="empty" id="empty" style="display:none;">No users yet — add one above.</div>
+    </div>
+  </div>
+
+  <script>
+    const API = "http://localhost:5000";
+    let editingId = null;   // null = add mode, otherwise = editing that user
+
+    async function load() {
+      const status = document.getElementById("status");
+      try {
+        const res = await fetch(`${API}/users`);
+        const users = await res.json();
+        render(users);
+      } catch (err) {
+        status.textContent = "Cannot reach the server. Is crud.py running?";
+      }
+    }
+
+    function render(users) {
+      const tbody = document.getElementById("tbody");
+      const empty = document.getElementById("empty");
+      tbody.innerHTML = "";
+      empty.style.display = users.length ? "none" : "block";
+
+      for (const u of users) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${u.id}</td>
+          <td>${escapeHtml(u.name)}</td>
+          <td>${escapeHtml(u.email)}</td>
+          <td class="actions">
+            <button class="mini edit" onclick="startEdit(${u.id}, '${escapeAttr(u.name)}', '${escapeAttr(u.email)}')">Edit</button>
+            <button class="mini del" onclick="remove(${u.id})">Delete</button>
+          </td>`;
+        tbody.appendChild(tr);
+      }
+    }
+
+    async function save() {
+      const name = document.getElementById("name").value.trim();
+      const email = document.getElementById("email").value.trim();
+      const status = document.getElementById("status");
+      if (!name || !email) { status.textContent = "Name and email are required."; return; }
+
+      try {
+        if (editingId === null) {
+          // CREATE
+          await fetch(`${API}/users`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name, email })
+          });
+          status.textContent = "User added.";
+        } else {
+          // UPDATE
+          await fetch(`${API}/users/${editingId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name, email })
+          });
+          status.textContent = "User updated.";
+          cancelEdit();
+        }
+        clearForm();
+        load();
+      } catch (err) {
+        status.textContent = "Request failed.";
+      }
+    }
+
+    function startEdit(id, name, email) {
+      editingId = id;
+      document.getElementById("name").value = name;
+      document.getElementById("email").value = email;
+      document.getElementById("saveBtn").textContent = "Save changes";
+      document.getElementById("cancelBtn").style.display = "inline-block";
+      document.getElementById("status").textContent = `Editing user #${id}`;
+    }
+
+    function cancelEdit() {
+      editingId = null;
+      document.getElementById("saveBtn").textContent = "Add user";
+      document.getElementById("cancelBtn").style.display = "none";
+      clearForm();
+      document.getElementById("status").textContent = "";
+    }
+
+    async function remove(id) {
+      if (!confirm(`Delete user #${id}?`)) return;
+      try {
+        await fetch(`${API}/users/${id}`, { method: "DELETE" });
+        document.getElementById("status").textContent = "User deleted.";
+        if (editingId === id) cancelEdit();
+        load();
+      } catch (err) {
+        document.getElementById("status").textContent = "Delete failed.";
+      }
+    }
+
+    function clearForm() {
+      document.getElementById("name").value = "";
+      document.getElementById("email").value = "";
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c =>
+        ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    }
+    function escapeAttr(s) { return String(s).replace(/'/g, "\\'").replace(/"/g, "&quot;"); }
+
+    load();   // initial load
+  </script>
+</body>
+</html>
