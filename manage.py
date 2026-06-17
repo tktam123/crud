@@ -51,36 +51,50 @@ def prompt_user_details(default_name=None, default_email=None, default_phone=Non
     """
     while True:
         # ── name ──
-        prompt = f"Name [{default_name}]: " if default_name else "Name (or 'q' to cancel): "
+        if default_name:
+            prompt = f"Name [{default_name}]: "
+        else:
+            prompt = "Name (or 'q' to cancel): "
+ 
         name = input(prompt).strip()
+ 
         if name.lower() == "q":
             return None
-        if not name and default_name:       
+        if not name and default_name:        # pressed Enter -> keep original
             name = default_name
-
+ 
         # ── email ──
-        prompt = f"Email [{default_email}]: " if default_email else "Email (or 'q' to cancel): "
+        if default_email:
+            prompt = f"Email [{default_email}]: "
+        else:
+            prompt = "Email (or 'q' to cancel): "
+ 
         email = input(prompt).strip()
+ 
         if email.lower() == "q":
             return None
         if not email and default_email:
             email = default_email
-
+ 
         # ── phone ──
-        prompt = f"Phone [{default_phone}]: " if default_phone else "Phone (or 'q' to cancel): "
+        if default_phone:
+            prompt = f"Phone [{default_phone}]: "
+        else:
+            prompt = "Phone (or 'q' to cancel): "
+ 
         phone = input(prompt).strip()
+ 
         if phone.lower() == "q":
             return None
         if not phone and default_phone:
             phone = default_phone
-
+ 
         # ── validate: return if good, otherwise show error and loop again ──
         try:
             validate_user_input(name, email, phone)
             return name, email, phone
         except ValueError as e:
             print(f"  x {e}  Please try again.\n")
-
 
 def main():
     while True:
