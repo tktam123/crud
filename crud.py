@@ -76,13 +76,20 @@ def create_user(name, email, phone):
 def list_users():
     with get_conn() as conn:
         rows = conn.execute("SELECT * FROM users ORDER BY id").fetchall()
-        return rows  
+        result = []                  # empty list
+        for r in rows:               # loop rows
+            result.append(dict(r))   # change each row to dict and append to list
+        return result                # 4. return  list 
  
  
 def get_user(uid):
     with get_conn() as conn:
         row = conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
-        return row
+        if row:               # condition to check if row is not None
+            return dict(row)  # when there is a row, return it as a dict
+        else:
+            return None       # when it is empty, return None
+
  
  
 #UPDATE
