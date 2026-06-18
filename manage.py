@@ -2,22 +2,39 @@ import crud
 from crud import DatabaseError, validate_user_input, FIELD_NAMES, FIELDS
 
 try:
-    crud.init_db()
+    crud.init_db()  #create the database and table if they don't exist yet
 except DatabaseError as error:
     print(f"x {error}")
     raise SystemExit(1)
 
-
 def show_users():
-    users = crud.list_users()
-    if not users:
+    users = crud.list_users()  #show all users in the database
+    if not users:           # when no users exist
         print("  (there are no users yet)")
         return
-    header = "  ID  | " + " | ".join(f"{name.capitalize():<16}" for name in FIELD_NAMES)
+
+    # Build the header row
+    header_cells = []
+    for name in FIELD_NAMES: 
+        header_cells.append(f"{name.capitalize():<16}")
+    header = "  ID  | " + " | ".join(header_cells)
     print(header)
+
+    # Print a line of dashes under the header
     print("  " + "-" * (len(header) - 2))
+
+    # Print each user as a row
     for u in users:
-        row = f"  {u['id']:<3} | " + " | ".join(f"{str(u[name]):<16}" for name in FIELD_NAMES)
+        row = f"  {u['id']:<3} | "
+
+        cells = []
+        for name in FIELD_NAMES:
+            value = u[name]            # get the value for this field
+            text = str(value)          # convert to string
+            padded = f"{text:<16}"     # left-align in 16 characters
+            cells.append(padded)
+
+        row = row + " | ".join(cells)
         print(row)
 
 def menu():
