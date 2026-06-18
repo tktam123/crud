@@ -14,7 +14,7 @@ def get_conn():
 
     try:    #try connection 
         conn = sqlite3.connect(DB_PATH)  
-        conn.row_factory = sqlite3.Row
+        conn.row_factory = sqlite3.Row # allow access through row["column_name"]
         conn.execute("PRAGMA foreign_keys = ON")
         return conn
     except sqlite3.Error as error: 
@@ -34,7 +34,7 @@ def _check_email(v):
     if not _EMAIL_RE.match(v):
         raise ValueError(f"Email is the wrong format: {v}")
  
- 
+
 def _check_phone(v):
     if not _PHONE_RE.match(v):
         raise ValueError(f"Phone is the wrong format: {v}")
@@ -44,10 +44,11 @@ FIELDS = [
     {"name": "name",  "type": "TEXT NOT NULL", "validate": None},
     {"name": "email", "type": "TEXT NOT NULL", "validate": _check_email},
     {"name": "phone", "type": "TEXT NOT NULL", "validate": _check_phone},
+    {"name": "address", "type": "TEXT NOT NULL", "validate": None},   # ← optional field example
     # {"name": "address", "type": "TEXT", "validate": None},   # ← optional field example
 ]
  
-FIELD_NAMES = [f["name"] for f in FIELDS]
+FIELD_NAMES = [f["name"] for f in FIELDS] # create a list of field names from the FIELDS list
 
 def validate_user_input(data):
     for field in FIELDS:
@@ -69,29 +70,29 @@ def init_db():
 #create user object 
 
 #CREATE
-"""
-輸入:{"name": "Ken", "email": "ken@gmail.com", "phone": "12345678"}
-輸出:{"id": 1, "name": "Ken", "email": "ken@gmail.com", "phone": "12345678"}
-"""
+
+#input:{"name": "Ken", "email": "ken@gmail.com", "phone": "12345678"}
+#output:{"id": 1, "name": "Ken", "email": "ken@gmail.com", "phone": "12345678"}
+
 def create_user(data):
     validate_user_input(data)
     with get_conn() as conn:
         # ── 砌 cols:"name, email, phone" ──
-        cols_parts = []                      # 開一個空 list
-        for name in FIELD_NAMES:             # 逐個欄位名
-            cols_parts.append(name)          # 加入 list
-        cols = ", ".join(cols_parts)         # 用逗號連埋 → "name, email, phone"
+        cols_parts = []                      
+        for name in FIELD_NAMES:           
+            cols_parts.append(name)         
+        cols = ", ".join(cols_parts)         # connect fields,like "name, email, phone"
 
         # ── 砌 placeholders:"?, ?, ?" ──
-        ph_parts = []                        # 開一個空 list
-        for name in FIELD_NAMES:             # 有幾多欄位
-            ph_parts.append("?")             # 就加幾多個 "?"
-        placeholders = ", ".join(ph_parts)   # 連埋 → "?, ?, ?"
+        ph_parts = []                       
+        for name in FIELD_NAMES:             
+            ph_parts.append("?")             
+        placeholders = ", ".join(ph_parts)   # connect → "?, ?, ?"
 
         # ── 砌 values:["Ken", "ken@...", "123"] ──
-        values = []                          # 開一個空 list
-        for name in FIELD_NAMES:             # 逐個欄位名
-            values.append(data[name].strip())  # 去 data 攞值,剪空格,加入 list
+        values = []                          
+        for name in FIELD_NAMES:             
+            values.append(data[name].strip())  # add data and add to values list
 
         cur = conn.execute(
             f"INSERT INTO users ({cols}) VALUES ({placeholders})",
@@ -102,8 +103,8 @@ def create_user(data):
  
  
 #READ 
-#輸入:冇
-#輸出:[{"id": 1, ...}, {"id": 2, ...}] —— list of dicts
+#input nothing
+#output:[{"id": 1, ...}, {"id": 2, ...}] —— list of dicts
 def list_users():
     with get_conn() as conn:
         rows = conn.execute("SELECT * FROM users ORDER BY id").fetchall()
@@ -112,7 +113,8 @@ def list_users():
             result.append(dict(r))   # change each row to dict and append to list
         return result                # return  list 
  
-#搵到:輸入 1 → 輸出 {"id": 1, "name": "Ken", ...}(一個 dict)
+# input : id = 1
+# output {"id": 1, "name": "Ken", ...}(一個 dict)
 def get_user(uid):
     with get_conn() as conn:
         row = conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
@@ -124,13 +126,21 @@ def get_user(uid):
  
  
 #UPDATE
-#成功:輸入 1, {"name": "Kenny", ...} → 輸出 {"id": 1, "name": "Kenny", ...}(更新後)
-#ID 唔存在:輸入 99, {...} → 輸出 None
+#input: uid = 1, {"name": "Kenny", "email": "
+#output: {"id": 1, "name": "Kenny", ...}
 def update_user(uid, data):
     validate_user_input(data) #validate the input before updating the user
     with get_conn() as conn:
-        assignments = ", ".join(f"{k} = ?" for k in FIELD_NAMES)  # "name = ?, email = ?, ..."
-        values = [data[k].strip() for k in FIELD_NAMES] + [uid]   # 值 + 最後 uid
+        # One pass over the fields: build the SET clause parts and the values together.
+        assignment_parts = []
+        values = []
+        for k in FIELD_NAMES:
+            assignment_parts.append(f"{k} = ?")   # "name = ?", "email = ?", "phone = ?"
+            values.append(data[k].strip())        # "Ken", "ken@new.com", "01612345678"
+
+        assignments = ", ".join(assignment_parts)  # "name = ?, email = ?, phone = ?"
+        values.append(uid)                         # add uid last, for "WHERE id = ?"
+
         cur = conn.execute(
             f"UPDATE users SET {assignments} WHERE id = ?",
             values,

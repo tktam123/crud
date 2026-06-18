@@ -49,7 +49,7 @@ def prompt_user_details(defaults=None):
     while True:
         data = {}
         cancelled = False
-        for name in FIELD_NAMES:                       # 逐個欄位問
+        for name in FIELD_NAMES:                       # ask input for each field
             old = defaults.get(name)
             if old:
                 prompt = f"{name.capitalize()} [{old}]: "
@@ -60,7 +60,7 @@ def prompt_user_details(defaults=None):
             if value.lower() == "q":
                 cancelled = True
                 break
-            if not value and old:                      # 撳 Enter 保留舊值
+            if not value and old:                      # press Enter to keep the old value
                 value = old
             data[name] = value
  
@@ -86,7 +86,7 @@ def main():
             # ---- CREATE ----
             elif choice == "2":
                 data = prompt_user_details()
-                if data is None: # if the user input is None, meaning the user typed 'q' to cancel
+                if data is None: # if there is no input, meaning the user typed 'q' to cancel
                     print("  (cancelled)")
                     continue  
                 user = crud.create_user(data)
@@ -98,12 +98,12 @@ def main():
                 uid = ask_id("Change which ID: ")
                 if uid is None:  # if the user input is not a number
                     continue        #back to the main menu
-                existing = crud.get_user(uid)
-                if not existing:
+                existing = crud.get_user(uid) # chek if the regard row exist 
+                if not existing:   # chek if the regard row exist 
                     print(f"  x can't find #{uid}")
                     continue
                 # original values become defaults: press Enter to keep them
-                data = prompt_user_details(existing)   # 傳成個 dict 做 defaults
+                data = prompt_user_details(existing)   # send the dict to as defaults
                 if data is None:
                     print("  (cancelled)")
                     continue
