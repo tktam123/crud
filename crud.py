@@ -54,20 +54,16 @@ def validate_user_input(data):
     for field in FIELDS:
         key = field["name"]
         value = data.get(key, "")
-        if not value or not value.strip():
-            raise ValueError(f"{key.capitalize()} can't be empty")
-        if field["validate"]:  # if there is a value
+        if not value or not value.strip(): #if the value is empty or only whitespace
+            raise ValueError(f"{key.capitalize()} can't be empty") 
+        if field["validate"]:  # if there is a validation function
             field["validate"](value.strip()) 
 
 def init_db():
     with get_conn() as conn:
-        cols = ", ".join(f"{f['name']} {f['type']}" for f in FIELDS)
-        conn.execute(
-            f"CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, {cols})"
-        )
+        cols = ", ".join(f"{f['name']} {f['type']}" for f in FIELDS) #create string like this "name TEXT NOT NULL, email TEXT NOT NULL, phone TEXT NOT NULL"
+        conn.execute(f"CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, {cols})")
         conn.commit()
-
-#create user object 
 
 #CREATE
 
@@ -77,27 +73,24 @@ def init_db():
 def create_user(data):
     validate_user_input(data)
     with get_conn() as conn:
-        # ── 砌 cols:"name, email, phone" ──
+        # ──build cols:"name, email, phone" ──
         cols_parts = []                      
         for name in FIELD_NAMES:           
             cols_parts.append(name)         
         cols = ", ".join(cols_parts)         # connect fields,like "name, email, phone"
 
-        # ── 砌 placeholders:"?, ?, ?" ──
+        # ── build placeholders:"?, ?, ?" ──
         ph_parts = []                       
         for name in FIELD_NAMES:             
             ph_parts.append("?")             
         placeholders = ", ".join(ph_parts)   # connect → "?, ?, ?"
 
-        # ── 砌 values:["Ken", "ken@...", "123"] ──
+        # ── build values:["Ken", "ken@...", "123"] ──
         values = []                          
         for name in FIELD_NAMES:             
             values.append(data[name].strip())  # add data and add to values list
 
-        cur = conn.execute(
-            f"INSERT INTO users ({cols}) VALUES ({placeholders})",
-            values,
-        )
+        cur = conn.execute(f"INSERT INTO users ({cols}) VALUES ({placeholders})",values,)
         conn.commit()
         return get_user(cur.lastrowid)# return the newly created row as a dict, using the last inserted row id
  
@@ -106,8 +99,8 @@ def create_user(data):
 #input nothing
 #output:[{"id": 1, ...}, {"id": 2, ...}] —— list of dicts
 def list_users():
-    with get_conn() as conn:
-        rows = conn.execute("SELECT * FROM users ORDER BY id").fetchall()
+    with get_conn() as conn: 
+        rows = conn.execute("SELECT * FROM users ORDER BY id").fetchall() # get all rows from the users table, ordered by id
         result = []                  # empty list
         for r in rows:               # loop rows
             result.append(dict(r))   # change each row to dict and append to list
@@ -117,8 +110,8 @@ def list_users():
 # output {"id": 1, "name": "Ken", ...}(一個 dict)
 def get_user(uid):
     with get_conn() as conn:
-        row = conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
-        if row:               # condition to check if row is not None
+        row = conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone() # get the row with the given uid
+        if row:               # condition to check if row exists
             return dict(row)  # when there is a row, return it as a dict
         else:
             return None       # when it is empty, return None
@@ -142,9 +135,8 @@ def update_user(uid, data):
         values.append(uid)                         # add uid last, for "WHERE id = ?"
 
         cur = conn.execute(
-            f"UPDATE users SET {assignments} WHERE id = ?",
-            values,
-        )
+            f"UPDATE users SET {assignments} WHERE id = ?",values,)
+        conn.commit()
         if cur.rowcount == 0: # if no rows were updated
             return None
         return get_user(uid) #return the updated row as a dict
