@@ -9,16 +9,16 @@ except DatabaseError as error:
 
 
 def show_users():
-    """Print all users as a small table."""
     users = crud.list_users()
-    if not users:                   #when list is empty
+    if not users:
         print("  (there are no users yet)")
         return
-    print("  ID  | Name             | Email                     | Phone")
-    print("  ----+------------------+---------------------------+----------------")
+    header = "  ID  | " + " | ".join(f"{name.capitalize():<16}" for name in FIELD_NAMES)
+    print(header)
+    print("  " + "-" * (len(header) - 2))
     for u in users:
-        print(f"  {u['id']:<3} | {u['name']:<16} | {u['email']:<25} | {u['phone']}")
-
+        row = f"  {u['id']:<3} | " + " | ".join(f"{str(u[name]):<16}" for name in FIELD_NAMES)
+        print(row)
 
 def menu():
     """Print the main menu options."""
