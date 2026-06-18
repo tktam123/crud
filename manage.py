@@ -3,15 +3,15 @@ from crud import DatabaseError, validate_user_input
 
 try:
     crud.init_db()
-except DatabaseError as e:
-    print(f"x {e}")
+except DatabaseError as error:
+    print(f"x {error}")
     raise SystemExit(1)
 
 
 def show_users():
     """Print all users as a small table."""
     users = crud.list_users()
-    if not users:
+    if not users:                   #when list is empty
         print("  (there are no users yet)")
         return
     print("  ID  | Name             | Email                     | Phone")
@@ -32,10 +32,6 @@ def menu():
 
 
 def ask_id(prompt):
-    """
-    Ask for an ID and check it's a number.
-    Shared by Update and Delete (DRY). Returns int, or None if invalid.
-    """
     raw = input(prompt).strip()
     if not raw.isdigit():
         print("  x Please enter a number.")
@@ -51,16 +47,16 @@ def prompt_user_details(default_name=None, default_email=None, default_phone=Non
     """
     while True:
         # ── name ──
-        if default_name:
+        if default_name:        #when there is a default name, show it in the prompt
             prompt = f"Name [{default_name}]: "
-        else:
+        else:                   #when there is no default name, show the prompt without the default name
             prompt = "Name (or 'q' to cancel): "
  
         name = input(prompt).strip()
  
         if name.lower() == "q":
             return None
-        if not name and default_name:        # pressed Enter -> keep original
+        if not name and default_name:        # when empty and with old value
             name = default_name
  
         # ── email ──
@@ -93,8 +89,8 @@ def prompt_user_details(default_name=None, default_email=None, default_phone=Non
         try:
             validate_user_input(name, email, phone)
             return name, email, phone
-        except ValueError as e:
-            print(f"  x {e}  Please try again.\n")
+        except ValueError as error:
+            print(f"  x {error}  Please try again.\n")
 
 def main():
     while True:
@@ -109,9 +105,9 @@ def main():
             # ---- CREATE ----
             elif choice == "2":
                 details = prompt_user_details()
-                if details is None:
+                if details is None: # if the user input is None, meaning the user typed 'q' to cancel
                     print("  (cancelled)")
-                    continue
+                    continue  
                 name, email, phone = details
                 user = crud.create_user(name, email, phone)
                 print(f"  + added #{user['id']}: {user['name']}")
@@ -120,8 +116,8 @@ def main():
             elif choice == "3":
                 show_users()
                 uid = ask_id("Change which ID: ")
-                if uid is None:
-                    continue
+                if uid is None:  # if the user input is not a number
+                    continue        #back to the main menu
                 existing = crud.get_user(uid)
                 if not existing:
                     print(f"  x can't find #{uid}")
@@ -155,8 +151,8 @@ def main():
             else:
                 print("  x choose from 1-5 only")
 
-        except DatabaseError as e:
-            print(f"  x {e}")
+        except DatabaseError as error:
+            print(f"  x {error}")
 
 
 if __name__ == "__main__":
