@@ -1,5 +1,5 @@
 import crud
-from crud import DatabaseError, validate_user_input
+from crud import DatabaseError, validate_user_input, FIELD_NAMES, FIELDS
 
 try:
     crud.init_db()
@@ -39,56 +39,37 @@ def ask_id(prompt):
     return int(raw)
 
 
-def prompt_user_details(default_name=None, default_email=None, default_phone=None):
+def prompt_user_details(defaults=None):
     """
     Keep asking for name + email + phone until the format is valid, then
-    return (name, email, phone). Type 'q' at any point to cancel -> None.
-
+    return a dict of the values. Type 'q' at any point to cancel -> None.
+    Existing values (passed in via `defaults`) are shown and kept on Enter.
     """
+    defaults = defaults or {}
     while True:
-        # ── name ──
-        if default_name:        #when there is a default name, show it in the prompt
-            prompt = f"Name [{default_name}]: "
-        else:                   #when there is no default name, show the prompt without the default name
-            prompt = "Name (or 'q' to cancel): "
+        data = {}
+        cancelled = False
+        for name in FIELD_NAMES:                       # 逐個欄位問
+            old = defaults.get(name)
+            if old:
+                prompt = f"{name.capitalize()} [{old}]: "
+            else:
+                prompt = f"{name.capitalize()} (or 'q' to cancel): "
  
-        name = input(prompt).strip()
+            value = input(prompt).strip()
+            if value.lower() == "q":
+                cancelled = True
+                break
+            if not value and old:                      # 撳 Enter 保留舊值
+                value = old
+            data[name] = value
  
-        if name.lower() == "q":
+        if cancelled:
             return None
-        if not name and default_name:        # when empty and with old value
-            name = default_name
  
-        # ── email ──
-        if default_email:
-            prompt = f"Email [{default_email}]: "
-        else:
-            prompt = "Email (or 'q' to cancel): "
- 
-        email = input(prompt).strip()
- 
-        if email.lower() == "q":
-            return None
-        if not email and default_email:
-            email = default_email
- 
-        # ── phone ──
-        if default_phone:
-            prompt = f"Phone [{default_phone}]: "
-        else:
-            prompt = "Phone (or 'q' to cancel): "
- 
-        phone = input(prompt).strip()
- 
-        if phone.lower() == "q":
-            return None
-        if not phone and default_phone:
-            phone = default_phone
- 
-        # ── validate: return if good, otherwise show error and loop again ──
         try:
-            validate_user_input(name, email, phone)
-            return name, email, phone
+            validate_user_input(data)
+            return data
         except ValueError as error:
             print(f"  x {error}  Please try again.\n")
 
@@ -104,12 +85,11 @@ def main():
 
             # ---- CREATE ----
             elif choice == "2":
-                details = prompt_user_details()
-                if details is None: # if the user input is None, meaning the user typed 'q' to cancel
+                data = prompt_user_details()
+                if data is None: # if the user input is None, meaning the user typed 'q' to cancel
                     print("  (cancelled)")
                     continue  
-                name, email, phone = details
-                user = crud.create_user(name, email, phone)
+                user = crud.create_user(data)
                 print(f"  + added #{user['id']}: {user['name']}")
 
             # ---- UPDATE ----
@@ -123,23 +103,22 @@ def main():
                     print(f"  x can't find #{uid}")
                     continue
                 # original values become defaults: press Enter to keep them
-                details = prompt_user_details(existing["name"], existing["email"], existing["phone"])
-                if details is None:
+                data = prompt_user_details(existing)   # 傳成個 dict 做 defaults
+                if data is None:
                     print("  (cancelled)")
                     continue
-                name, email, phone = details
-                user = crud.update_user(uid, name, email, phone)
-                print(f"  + changed #{user['id']}: {user['name']} <{user['email']}> {user['phone']}")
+                user = crud.update_user(uid, data)
+                print(f"  + changed #{user['id']}: {user['name']}")
 
             # ---- DELETE ----
             elif choice == "4":
                 show_users()
                 uid = ask_id("Delete which ID: ")
-                if uid is None:
+                if uid is None:  #not a number
                     continue
                 user = crud.delete_user(uid)
                 if user:
-                    print(f"  + deleted #{user['id']}: {user['name']} <{user['email']}> {user['phone']}")
+                    print(f"  + deleted #{user['id']}: {user['name']}")
                 else:
                     print(f"  x can't find #{uid}")
 
