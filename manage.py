@@ -1,21 +1,22 @@
 import crud
-from crud import DatabaseError, validate_user_input, FIELD_NAMES, FIELDS
+from crud import DatabaseError
+from models import FIELD_NAMES
 
 try:
-    crud.init_db()  #create the database and table if they don't exist yet
+    crud.init_db()  # create the database and table if they don't exist yet
 except DatabaseError as error:
     print(f"x {error}")
     raise SystemExit(1)
 
 def show_users():
-    users = crud.list_users()  #show all users in the database
+    users = crud.list_users()  # show all users in the database
     if not users:           # when no users exist
         print("  (there are no users yet)")
         return
 
     # Build the header row
     header_cells = []
-    for name in FIELD_NAMES: 
+    for name in FIELD_NAMES:
         header_cells.append(f"{name.capitalize():<16}")
     header = "  ID  | " + " | ".join(header_cells)
     print(header)
@@ -25,11 +26,11 @@ def show_users():
 
     # Print each user as a row
     for u in users:
-        row = f"  {u['id']:<3} | "
+        row = f"  {u.id:<3} | "
 
         cells = []
         for name in FIELD_NAMES:
-            value = u[name]            # get the value for this field
+            value = getattr(u, name)   # attribute access instead of u[name]
             text = str(value)          # convert to string
             padded = f"{text:<16}"     # left-align in 16 characters
             cells.append(padded)
@@ -58,21 +59,21 @@ def ask_id(prompt):
 
 def prompt_user_details(defaults=None):
     """
-    Keep asking for name + email + phone until the format is valid, then
-    return a dict of the values. Type 'q' at any point to cancel -> None.
-    Existing values (passed in via `defaults`) are shown and kept on Enter.
+    Keep asking for name + email + phone + address until the format is
+    valid, then return a dict of the values. Type 'q' at any point to
+    cancel -> None. Existing values (passed in via `defaults`, a User
+    object) are shown and kept on Enter.
     """
-    defaults = defaults or {}
     while True:
         data = {}
         cancelled = False
         for name in FIELD_NAMES:                       # ask input for each field
-            old = defaults.get(name)
+            old = getattr(defaults, name, None) if defaults else None
             if old:
                 prompt = f"{name.capitalize()} [{old}]: "
             else:
                 prompt = f"{name.capitalize()} (or 'q' to cancel): "
- 
+
             value = input(prompt).strip()
             if value.lower() == "q":
                 cancelled = True
@@ -80,15 +81,27 @@ def prompt_user_details(defaults=None):
             if not value and old:                      # press Enter to keep the old value
                 value = old
             data[name] = value
- 
+
         if cancelled:
             return None
- 
+
+        # Validation now happens inside create_user/update_user, via the
+        # User model's @validates methods — if a value is bad, those
+        # functions raise ValueError, which we catch here and loop again.
         try:
-            validate_user_input(data)
+            _dry_run_validate(data)
             return data
         except ValueError as error:
             print(f"  x {error}  Please try again.\n")
+
+
+def _dry_run_validate(data):
+    """Check the values are valid before committing to the DB, by
+    building a throwaway User object — its @validates methods raise
+    ValueError on bad input, same as the old validate_user_input()."""
+    from models import User
+    User(**data)
+
 
 def main():
     while True:
@@ -103,39 +116,39 @@ def main():
             # ---- CREATE ----
             elif choice == "2":
                 data = prompt_user_details()
-                if data is None: # if there is no input, meaning the user typed 'q' to cancel
+                if data is None:  # if there is no input, meaning the user typed 'q' to cancel
                     print("  (cancelled)")
-                    continue  
+                    continue
                 user = crud.create_user(data)
-                print(f"  + added #{user['id']}: {user['name']}")
+                print(f"  + added #{user.id}: {user.name}")
 
             # ---- UPDATE ----
             elif choice == "3":
                 show_users()
                 uid = ask_id("Change which ID: ")
                 if uid is None:  # if the user input is not a number
-                    continue        #back to the main menu
-                existing = crud.get_user(uid) # chek if the regard row exist 
-                if not existing:   # chek if the regard row exist 
+                    continue        # back to the main menu
+                existing = crud.get_user(uid)  # check if the relevant row exists
+                if not existing:   # check if the relevant row exists
                     print(f"  x can't find #{uid}")
                     continue
                 # original values become defaults: press Enter to keep them
-                data = prompt_user_details(existing)   # send the dict to as defaults
+                data = prompt_user_details(existing)   # send the User object as defaults
                 if data is None:
                     print("  (cancelled)")
                     continue
                 user = crud.update_user(uid, data)
-                print(f"  + changed #{user['id']}: {user['name']}")
+                print(f"  + changed #{user.id}: {user.name}")
 
             # ---- DELETE ----
             elif choice == "4":
                 show_users()
                 uid = ask_id("Delete which ID: ")
-                if uid is None:  #not a number
+                if uid is None:  # not a number
                     continue
                 user = crud.delete_user(uid)
                 if user:
-                    print(f"  + deleted #{user['id']}: {user['name']}")
+                    print(f"  + deleted #{user.id}: {user.name}")
                 else:
                     print(f"  x can't find #{uid}")
 
@@ -148,6 +161,8 @@ def main():
                 print("  x choose from 1-5 only")
 
         except DatabaseError as error:
+            print(f"  x {error}")
+        except ValueError as error:
             print(f"  x {error}")
 
 
